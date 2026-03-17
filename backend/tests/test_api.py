@@ -1,7 +1,3 @@
-"""
-Test suite for the Video Transcoding Platform API.
-Run with: pytest tests/ -v
-"""
 
 import pytest
 import json
