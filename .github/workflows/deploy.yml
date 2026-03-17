@@ -1,68 +1,70 @@
-name: Deploy Platform
+name: Deploy to ECS (with AWS Session Token)
 
 on:
   push:
     branches:
       - main
 
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: video-platform
+  ECS_CLUSTER: video-cluster
+  ECS_SERVICE_WEB: video-web
+  ECS_SERVICE_WORKER: video-worker
+
 jobs:
   deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # 📥 Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 🔐 Configure AWS credentials (WITH TOKEN)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      # 🔑 Login to ECR
+      - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ---------------- FRONTEND ----------------
-
-      - name: Build frontend image
+      # 🏗️ Build Docker image
+      - name: Build Docker image
         run: |
-          docker build -t transcoding-frontend ./frontend
+          docker build -t $ECR_REPOSITORY:latest .
 
-      - name: Tag frontend image
+      # 🏷️ Tag Docker image
+      - name: Tag Docker image
         run: |
-          docker tag transcoding-frontend:latest \
-          975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-frontend:latest
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+          docker tag $ECR_REPOSITORY:latest $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
-      - name: Push frontend image
+      # 📤 Push image to ECR
+      - name: Push Docker image
         run: |
-          docker push 975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-frontend:latest
+          docker push $IMAGE_URI
 
-      - name: Deploy frontend
-        run: |
-          aws ecs update-service \
-          --cluster ${{ secrets.ECS_CLUSTER }} \
-          --service ${{ secrets.ECS_FRONTEND_SERVICE }} \
-          --force-new-deployment
-
-      # ---------------- BACKEND API ----------------
-
-      - name: Build API image
-        run: |
-          docker build -t transcoding-api ./backend
-
-      - name: Tag API image
-        run: |
-          docker tag transcoding-api:latest \
-          975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-api:latest
-
-      - name: Push API image
-        run: |
-          docker push 975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-api:latest
-
-      - name: Deploy API
+      # 🔁 Deploy Web Service
+      - name: Force new deployment (Web)
         run: |
           aws ecs update-service \
-          --cluster ${{ secrets.ECS_CLUSTER }} \
-          --service ${{ secrets.ECS_API_SERVICE }} \
-          --force-new-deployment
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_WEB \
+            --force-new-deployment
+
+      # 🔁 Deploy Worker Service
+      - name: Force new deployment (Worker)
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_WORKER \
+            --force-new-deployment
