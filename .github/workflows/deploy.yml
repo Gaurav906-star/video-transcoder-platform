@@ -1,4 +1,4 @@
-name: Deploy to ECS (with AWS Session Token)
+name: Deploy to ECS (LabRole + Session Token)
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🔐 Configure AWS credentials (WITH TOKEN)
+      # 🔐 Configure AWS credentials (TEMP SESSION)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -30,6 +30,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      # 🧪 DEBUG (VERY IMPORTANT)
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
 
       # 🔑 Login to ECR
       - name: Login to Amazon ECR
