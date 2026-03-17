@@ -1,4 +1,4 @@
-name: Deploy to ECS
+name: Deploy Platform
 
 on:
   push:
@@ -23,22 +23,46 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
+      # ---------------- FRONTEND ----------------
+
+      - name: Build frontend image
         run: |
           docker build -t transcoding-frontend ./frontend
 
-      - name: Tag image
+      - name: Tag frontend image
         run: |
           docker tag transcoding-frontend:latest \
           975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-frontend:latest
 
-      - name: Push image to ECR
+      - name: Push frontend image
         run: |
           docker push 975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-frontend:latest
 
-      - name: Deploy to ECS
+      - name: Deploy frontend
         run: |
           aws ecs update-service \
           --cluster ${{ secrets.ECS_CLUSTER }} \
-          --service ${{ secrets.ECS_SERVICE }} \
+          --service ${{ secrets.ECS_FRONTEND_SERVICE }} \
+          --force-new-deployment
+
+      # ---------------- BACKEND API ----------------
+
+      - name: Build API image
+        run: |
+          docker build -t transcoding-api ./backend
+
+      - name: Tag API image
+        run: |
+          docker tag transcoding-api:latest \
+          975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-api:latest
+
+      - name: Push API image
+        run: |
+          docker push 975049973618.dkr.ecr.us-east-1.amazonaws.com/transcoding-api:latest
+
+      - name: Deploy API
+        run: |
+          aws ecs update-service \
+          --cluster ${{ secrets.ECS_CLUSTER }} \
+          --service ${{ secrets.ECS_API_SERVICE }} \
           --force-new-deployment

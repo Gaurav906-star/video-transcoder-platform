@@ -14,5 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# IMPORTANT: set Flask app
+ENV FLASK_APP=run:app
+
 EXPOSE 5000
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "run:app"]
+
+# Run migrations before starting app
+CMD sh -c "flask db upgrade && gunicorn -w 4 -b 0.0.0.0:5000 run:app"
